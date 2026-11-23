@@ -1,0 +1,300 @@
+<div class="app-shell">
+  <!-- Header -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">A</div>
+      <div>
+        <h1>Alert Console</h1>
+        <p>Operations monitoring</p>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <span class="live-indicator"></span>
+      <span>Monitoring active</span>
+      <span class="header-date">{{ today | date: 'dd MMM yyyy' }}</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <!-- Page heading -->
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">OPERATIONS / MONITORING</p>
+        <h2>System Alerts</h2>
+        <p class="subtitle">Monitor, investigate and resolve system alerts.</p>
+      </div>
+      <div class="total-badge">
+        <span class="live-indicator"></span>
+        {{ alerts().length }} total alerts
+      </div>
+    </section>
+
+    <!-- Summary cards -->
+    <section class="summary-grid">
+      <article class="summary-card">
+        <div class="summary-top">
+          <span>Open alerts</span>
+          <span class="metric-icon open-icon">O</span>
+        </div>
+        <strong>{{ openCount() }}</strong>
+        <small>Awaiting investigation</small>
+      </article>
+
+      <article class="summary-card">
+        <div class="summary-top">
+          <span>Escalated</span>
+          <span class="metric-icon escalated-icon">!</span>
+        </div>
+        <strong>{{ escalatedCount() }}</strong>
+        <small>Require attention</small>
+      </article>
+
+      <article class="summary-card">
+        <div class="summary-top">
+          <span>Critical severity</span>
+          <span class="metric-icon critical-icon">!</span>
+        </div>
+        <strong>{{ criticalCount() }}</strong>
+        <small>Across all statuses</small>
+      </article>
+
+      <article class="summary-card">
+        <div class="summary-top">
+          <span>Total alerts</span>
+          <span class="metric-icon total-icon">#</span>
+        </div>
+        <strong>{{ alerts().length }}</strong>
+        <small>Generated alert records</small>
+      </article>
+    </section>
+
+    <!-- Main content -->
+    <section class="workspace">
+      <!-- Alert table -->
+      <div class="table-panel">
+        <div class="panel-heading">
+          <div>
+            <h3>All alerts</h3>
+            <p>Review and investigate incoming alerts</p>
+          </div>
+          <span class="result-count">
+            Showing {{ filteredAlerts().length }} of {{ alerts().length }}
+          </span>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+          <label>
+            Status
+            <select [value]="statusFilter()" (change)="statusFilter.set($any($event.target).value)">
+              <option value="">All statuses</option>
+              @for (status of statuses; track status) {
+                <option [value]="status">{{ status.replace('_', ' ') }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Severity
+            <select
+              [value]="severityFilter()"
+              (change)="severityFilter.set($any($event.target).value)"
+            >
+              <option value="">All severities</option>
+              @for (severity of severities; track severity) {
+                <option [value]="severity">{{ severity }}</option>
+              }
+            </select>
+          </label>
+
+          <label>
+            Source
+            <select [value]="sourceFilter()" (change)="sourceFilter.set($any($event.target).value)">
+              <option value="">All sources</option>
+              @for (source of sources; track source) {
+                <option [value]="source">{{ source }}</option>
+              }
+            </select>
+          </label>
+
+          <button class="clear-button" (click)="clearFilters()">Clear filters</button>
+        </div>
+
+        <!-- Table -->
+        @if (filteredAlerts().length > 0) {
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Alert ID</th>
+                  <th>Source</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Created at</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                @for (alert of filteredAlerts(); track alert.id) {
+                  <tr
+                    [class.selected-row]="selectedId() === alert.id"
+                    (click)="selectAlert(alert)"
+                    tabindex="0"
+                    [attr.aria-selected]="selectedId() === alert.id"
+                    (keydown.enter)="selectAlert(alert)"
+                    (keydown.space)="selectAlert(alert); $event.preventDefault()"
+                  >
+                    <td class="alert-id">{{ alert.id }}</td>
+                    <td>{{ alert.source }}</td>
+
+                    <td>
+                      <span class="severity-chip" [ngClass]="getSeverityClass(alert.severity)">
+                        {{ alert.severity }}
+                      </span>
+                    </td>
+
+                    <td>
+                      <span class="status-chip" [ngClass]="getStatusClass(alert.status)">
+                        {{ alert.status.replace('_', ' ') }}
+                      </span>
+                    </td>
+
+                    <td class="date-cell">
+                      {{ alert.createdAt | date: 'dd MMM, HH:mm' }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <div class="empty-icon">⌕</div>
+            <h4>No alerts found</h4>
+            <p>Try changing your filters or clear them to see all alerts.</p>
+            <button class="clear-button" (click)="clearFilters()">Clear filters</button>
+          </div>
+        }
+      </div>
+
+      <!-- Detail panel -->
+      <aside class="detail-panel">
+        @if (selectedAlert(); as alert) {
+          <div class="detail-heading">
+            <div>
+              <p class="eyebrow">ALERT DETAILS</p>
+              <h3>{{ alert.id }}</h3>
+            </div>
+            <span class="severity-chip" [ngClass]="getSeverityClass(alert.severity)">
+              {{ alert.severity }}
+            </span>
+          </div>
+          @if (!isSelectedInFilteredResults()) {
+            <div class="filter-notice">This alert is outside the current filter results.</div>
+          }
+
+          <div class="detail-status">
+            <span>Status</span>
+            <span class="status-chip" [ngClass]="getStatusClass(alert.status)">
+              {{ alert.status.replace('_', ' ') }}
+            </span>
+          </div>
+
+          <div class="metadata-grid">
+            <div>
+              <span>Source</span>
+              <strong>{{ alert.source }}</strong>
+            </div>
+            <div>
+              <span>Created at</span>
+              <strong>{{ alert.createdAt | date: 'dd MMM yyyy, HH:mm:ss' }}</strong>
+            </div>
+            <div>
+              <span>Alert ID</span>
+              <strong>{{ alert.id }}</strong>
+            </div>
+            <div>
+              <span>Severity</span>
+              <strong>{{ alert.severity }}</strong>
+            </div>
+          </div>
+
+          <div class="section-divider"></div>
+
+          <div class="history-heading">
+            <div>
+              <h4>State history</h4>
+              <p>Timeline of alert activity</p>
+            </div>
+            <span class="history-count">{{ alert.history.length }} events</span>
+          </div>
+
+          <div class="timeline">
+            @for (event of alert.history; track $index) {
+              <div class="timeline-item">
+                <div class="timeline-marker" [ngClass]="getStatusClass(event.state)"></div>
+                <div class="timeline-content">
+                  <strong>{{ event.state.replace('_', ' ') }}</strong>
+                  <span>{{ event.ts | date: 'dd MMM yyyy, HH:mm:ss' }}</span>
+
+                  @if (event.note) {
+                    <p class="timeline-note">{{ event.note }}</p>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Resolve action -->
+          @if (canResolve()) {
+            <div class="resolve-section">
+              <div class="section-divider"></div>
+              <h4>Resolve alert</h4>
+              <p class="resolve-description">Add a resolution note to close this alert.</p>
+
+              <form [formGroup]="resolveForm" (ngSubmit)="resolveSelectedAlert()">
+                <label for="resolution-note">Resolution note</label>
+                <textarea
+                  id="resolution-note"
+                  formControlName="note"
+                  placeholder="Describe the action taken..."
+                  rows="3"
+                >
+                </textarea>
+
+                @if (resolveForm.controls.note.touched && resolveForm.controls.note.invalid) {
+                  <small class="error-message"> Please enter a non-empty resolution note. </small>
+                }
+
+                @if (formError()) {
+                  <small class="error-message">{{ formError() }}</small>
+                }
+
+                <button type="submit" class="resolve-button" [disabled]="isSaving()">
+                  @if (isSaving()) {
+                    <span class="spinner"></span>
+                    Resolving...
+                  } @else {
+                    Resolve alert
+                  }
+                </button>
+              </form>
+            </div>
+          } @else {
+            <div class="resolved-message">
+              <span>✓</span>
+              This alert is {{ alert.status.replace('_', ' ').toLowerCase() }}. No further action is
+              required.
+            </div>
+          }
+        } @else {
+          <div class="empty-detail">
+            <h4>Select an alert</h4>
+            <p>Choose an alert from the table to view its details.</p>
+          </div>
+        }
+      </aside>
+    </section>
+  </main>
+</div>
